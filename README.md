@@ -124,13 +124,15 @@ plt.show()
 
 
 # ⬇️ Installation
-To install Kinetix with a CUDA-enabled JAX backend (tested with python3.10):
+To install Kinetix (tested with python3.10):
 ```commandline
 git clone https://github.com/FlairOx/Kinetix.git
 cd Kinetix
 pip install -e ".[dev]"
 pre-commit install
 ```
+
+Please see [here](https://docs.jax.dev/en/latest/installation.html) to install jax for your accelerator.
 
 > [!TIP]
 > Setting `export JAX_COMPILATION_CACHE_DIR="$HOME/.jax_cache"` in your `~/.bashrc` helps improve usability by caching the jax compiles.
