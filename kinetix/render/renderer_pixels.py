@@ -6,21 +6,32 @@ from jax2d.engine import select_shape
 from jax2d.maths import rmat
 from jaxgl.maths import dist_from_line
 from jaxgl.renderer import clear_screen, make_renderer
-from jaxgl.shaders import fragment_shader_edged_quad, nearest_neighbour
+from jaxgl.shaders import (
+    nearest_neighbour,
+    make_fragment_shader_convex_ngon_with_edges,
+    fragment_shader_circle,
+)
 
 from kinetix.environment.env_state import EnvState, StaticEnvParams
 from kinetix.render.textures import FJOINT_TEXTURE_6_RGBA, RJOINT_TEXTURE_6_RGBA, THRUSTER_TEXTURE_16_RGBA
 
 
-def make_render_pixels(
-    env_params,
-    static_params: StaticEnvParams,
-):
+def make_render_pixels(env_params, static_params: StaticEnvParams):
     screen_dim = static_params.screen_dim
     downscale = static_params.downscale
 
     joint_tex_size = 6
     thruster_tex_size = 16
+
+    edge_thickness = 2
+    use_textures_for_joints = True
+    # if we downscale, the edges are too thick, and the textures do not show.
+    if downscale == 2:
+        edge_thickness = 1
+    elif downscale == 4:
+        edge_thickness = 0
+        use_textures_for_joints = False
+    fragment_shader_quad_no_edges = make_fragment_shader_convex_ngon_with_edges(4, edge_thickness=edge_thickness)
 
     FIXATED_COLOUR = jnp.array([80, 80, 80])
     JOINT_COLOURS = jnp.array(
@@ -83,7 +94,7 @@ def make_render_pixels(
 
         dist = jnp.sqrt(jnp.square(position - centre).sum())
         inside = dist <= radius
-        on_edge = dist > radius - 2
+        on_edge = dist > radius - edge_thickness
 
         normal = jnp.array([jnp.sin(rotation), -jnp.cos(rotation)])
 
@@ -95,7 +106,12 @@ def make_render_pixels(
 
         return jax.lax.select(inside & mask, fragment, current_frag)
 
-    def fragment_shader_kinetix_joint(position, current_frag, unit_position, uniform):
+    def fragment_shader_kinetix_joint_circle(position, current_frag, unit_position, uniform):
+        centre, radius, colour, mask = uniform
+        new = fragment_shader_circle(position, current_frag, unit_position, (centre, radius, colour))
+        return new * mask + (1 - mask) * current_frag
+
+    def fragment_shader_kinetix_joint_texture(position, current_frag, unit_position, uniform):
         texture, colour, mask = uniform
 
         tex_coord = (
@@ -149,12 +165,15 @@ def make_render_pixels(
     patch_size = (patch_size_1d, patch_size_1d)
 
     circle_renderer = make_renderer(full_screen_size, fragment_shader_kinetix_circle, patch_size, batched=True)
-    quad_renderer = make_renderer(full_screen_size, fragment_shader_edged_quad, patch_size, batched=True)
-    big_quad_renderer = make_renderer(full_screen_size, fragment_shader_edged_quad, downscaled_screen_dim)
+    quad_renderer = make_renderer(full_screen_size, fragment_shader_quad_no_edges, patch_size, batched=True)
+    big_quad_renderer = make_renderer(full_screen_size, fragment_shader_quad_no_edges, downscaled_screen_dim)
 
     joint_pixel_size = joint_tex_size // downscale
+    joint_fragment_shader = (
+        fragment_shader_kinetix_joint_texture if use_textures_for_joints else fragment_shader_kinetix_joint_circle
+    )
     joint_renderer = make_renderer(
-        full_screen_size, fragment_shader_kinetix_joint, (joint_pixel_size, joint_pixel_size), batched=True
+        full_screen_size, joint_fragment_shader, (joint_pixel_size, joint_pixel_size), batched=True
     )
 
     thruster_renderer = make_renderer(
@@ -230,7 +249,15 @@ def make_render_pixels(
             (state.motor_bindings + 1) * (state.joint.motor_on & (~state.joint.is_fixed_joint))
         ]
 
-        joint_uniforms = (joint_textures, joint_colours, state.joint.active)
+        if use_textures_for_joints:
+            joint_uniforms = (joint_textures, joint_colours, state.joint.active)
+        else:
+            joint_uniforms = (
+                joint_patch_positions + joint_pixel_size // 2,
+                jnp.ones(static_params.num_joints) * joint_pixel_size / 2,
+                joint_colours.astype(jnp.float32),
+                state.joint.active,
+            )
 
         pixels = joint_renderer(pixels, joint_patch_positions, joint_uniforms)
 
