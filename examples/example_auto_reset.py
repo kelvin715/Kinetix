@@ -5,8 +5,8 @@ from matplotlib import pyplot as plt
 
 from kinetix.environment import EnvParams, make_kinetix_env
 from kinetix.environment.env_state import StaticEnvParams
+from kinetix.environment import ActionType, ObservationType
 from kinetix.environment.ued.ued import make_reset_fn_sample_kinetix_level
-from kinetix.environment.utils import ActionType, ObservationType
 from kinetix.render import make_render_pixels
 
 
