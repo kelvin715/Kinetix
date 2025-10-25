@@ -312,6 +312,11 @@ def import_env_state_from_json(json_file: dict[str, Any]) -> tuple[EnvState, Sta
     static_env_params = json_file["static_env_params"]
     env_params_target = EnvParams()
     static_env_params_target = StaticEnvParams()
+
+    # Backward compatibility: add missing fields with defaults
+    if "effector_ball_dense_reward_scale" not in env_params:
+        env_params["effector_ball_dense_reward_scale"] = 0.0
+
     new_env_params = flax.serialization.from_state_dict(
         env_params_target, {k: normalise(k, v) for k, v in env_params.items()}
     )

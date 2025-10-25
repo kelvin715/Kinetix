@@ -49,3 +49,24 @@ python3 /proj-vertical-llms-pvc/users/zhihan/robots_proj/Kinetix/experiments/ppo
   eval=eval_general \
   'eval.eval_levels=["l/grasp_hard.json"]'
 
+
+python3 /proj-vertical-llms-pvc/users/zhihan/robots_proj/Kinetix/experiments/ppo_curriculum.py \
+  env_size=l eval=eval_general 'eval.eval_levels=["l/grasp_hard.json"]' \
+  learning.update_epochs=12 learning.num_minibatches=16 \
+  learning.warmup_lr=true learning.initial_lr=1e-5 learning.peak_lr=3e-4 \
+  learning.ent_coef=0.005 env.dense_reward_scale=0.5 \
+  learning.num_steps=32
+
+
+python3 /proj-vertical-llms-pvc/users/zhihan/robots_proj/Kinetix/experiments/ppo_curriculum.py \
+  env_size=l eval=eval_general 'eval.eval_levels=["l/grasp_hard.json", "l/grasp_levels/level_5/grasp_level5_v01.json","l/grasp_levels/level_5/grasp_level5_v02.json","l/grasp_levels/level_5/grasp_level5_v03.json","l/grasp_levels/level_5/grasp_level5_v04.json","l/grasp_levels/level_5/grasp_level5_v05.json","l/grasp_levels/level_5/grasp_level5_v06.json","l/grasp_levels/level_5/grasp_level5_v07.json","l/grasp_levels/level_5/grasp_level5_v08.json","l/grasp_levels/level_5/grasp_level5_v09.json","l/grasp_levels/level_5/grasp_level5_v10.json"]' \
+  learning.update_epochs=12 learning.num_minibatches=16 \
+  learning.warmup_lr=true learning.initial_lr=1e-5 learning.peak_lr=3e-4 \
+  learning.ent_coef=0.005 env.dense_reward_scale=0.3 \
+  learning.num_steps=32
+
+# 使用末端-球距离 shaping 的示例（设置系数>0启用）
+python3 /proj-vertical-llms-pvc/users/zhihan/robots_proj/Kinetix/experiments/ppo_curriculum.py \
+  env_size=l eval=eval_general 'eval.eval_levels=["l/grasp_hard.json", "l/grasp_levels/level_5/grasp_level5_v01.json","l/grasp_levels/level_5/grasp_level5_v02.json","l/grasp_levels/level_5/grasp_level5_v03.json","l/grasp_levels/level_5/grasp_level5_v04.json","l/grasp_levels/level_5/grasp_level5_v05.json","l/grasp_levels/level_5/grasp_level5_v06.json","l/grasp_levels/level_5/grasp_level5_v07.json","l/grasp_levels/level_5/grasp_level5_v08.json","l/grasp_levels/level_5/grasp_level5_v09.json","l/grasp_levels/level_5/grasp_level5_v10.json"]' \
+  env.dense_reward_scale=0.5 env.effector_ball_dense_reward_scale=0.5 \
+  learning.num_steps=32 learning.update_epochs=12 learning.num_minibatches=16

@@ -21,6 +21,8 @@ class EnvState(SimState):
     timestep: int = 0
 
     last_distance: float = -1.0
+    # Distance tracker for effector-to-ball shaping
+    last_distance_effector_ball: float = -1.0
 
 
 @struct.dataclass
@@ -29,6 +31,8 @@ class EnvParams(SimParams):
     pixels_per_unit: int = 100
     dense_reward_scale: float = 0.1
     num_shape_roles: int = 4
+    # Shaping coefficient for effector-to-ball distance (0 disables)
+    effector_ball_dense_reward_scale: float = 0.0
 
 
 @struct.dataclass

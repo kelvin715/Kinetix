@@ -39,7 +39,10 @@ def generate_params_from_config(config):
         return env_params, static_env_params.replace(
             frame_skip=config["frame_skip"],
         )
-    env_params = EnvParams().replace(dense_reward_scale=config["dense_reward_scale"])
+    env_params = EnvParams().replace(
+        dense_reward_scale=config["dense_reward_scale"],
+        effector_ball_dense_reward_scale=config.get("effector_ball_dense_reward_scale", 0.0),
+    )
 
     static_env_params = StaticEnvParams().replace(
         num_polygons=config["num_polygons"],

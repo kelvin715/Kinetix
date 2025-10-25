@@ -150,8 +150,57 @@ class KinetixEnv(Environment):
             (env_state.last_distance == -1) | (env_params.dense_reward_scale == 0.0), 0.0, delta_dist
         )
 
+        # Effector-to-ball dense shaping (optional): encourage end-effector to approach ball (role==1)
+        def _compute_effector_ball_distance(state: EnvState) -> jnp.ndarray:
+            circle_ball_mask = (state.circle_shape_roles == 1) & state.circle.active
+            poly_ball_mask = (state.polygon_shape_roles == 1) & state.polygon.active
+
+            circle_pos = state.circle.position
+            poly_pos = state.polygon.position
+
+            thr_mask = state.thruster.active
+            thr_pos = state.thruster.global_position
+
+            joint_mask = state.joint.active & (~state.joint.is_fixed_joint) & state.joint.motor_on
+            joint_pos = state.joint.global_position
+
+            eff_pos = jnp.concatenate([thr_pos, joint_pos], axis=0)
+            eff_mask = jnp.concatenate([thr_mask, joint_mask], axis=0)
+
+            def _masked_min_pairwise(a_pos, a_mask, b_pos, b_mask):
+                big = jnp.array(1e6, dtype=a_pos.dtype)
+                if a_pos.ndim == 1:
+                    a_pos = a_pos[None, :]
+                if b_pos.ndim == 1:
+                    b_pos = b_pos[None, :]
+                dists = jnp.linalg.norm(a_pos[:, None, :] - b_pos[None, :, :], axis=-1)
+                dists = jnp.where(a_mask[:, None], dists, big)
+                dists = jnp.where(b_mask[None, :], dists, big)
+                min_ab = dists.min(initial=big)
+                no_valid = (a_mask.sum() == 0) | (b_mask.sum() == 0)
+                return jnp.where(no_valid, jnp.array(0.0, dtype=dists.dtype), min_ab)
+
+            d1 = _masked_min_pairwise(eff_pos, eff_mask, circle_pos, circle_ball_mask)
+            d2 = _masked_min_pairwise(eff_pos, eff_mask, poly_pos, poly_ball_mask)
+            return jnp.minimum(d1, d2)
+
+        distance_eff = _compute_effector_ball_distance(env_state)
+        delta_eff = (
+            -(distance_eff - env_state.last_distance_effector_ball) * env_params.effector_ball_dense_reward_scale
+        )
+        delta_eff = jnp.nan_to_num(delta_eff, nan=0.0, posinf=0.0, neginf=0.0)
+        reward = reward + jax.lax.select(
+            (env_state.last_distance_effector_ball == -1) | (env_params.effector_ball_dense_reward_scale == 0.0),
+            0.0,
+            delta_eff,
+        )
+
         distance = jax.lax.select(done, -1.0, info["distance"])
-        env_state = env_state.replace(last_distance=distance)
+        distance_eff_next = jax.lax.select(done, -1.0, distance_eff)
+        env_state = env_state.replace(
+            last_distance=distance,
+            last_distance_effector_ball=distance_eff_next,
+        )
 
         return (
             jax.lax.stop_gradient(self.get_obs(env_state)),
