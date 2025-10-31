@@ -1,0 +1,21 @@
+defaults: []
+
+input_json: l/grasp_easy.json
+output_dir: outputs/level_variants
+num_variants: 20
+seed: 0
+
+vary:
+  position: true
+  rotation: true
+
+position:
+  range_x: [-0.75, 0.75]
+  range_y: [-0.75, 0.75]
+
+rotation:
+  range: [0.0, 6.283185307179586]
+
+override:
+  shape_type: auto
+  index: null
