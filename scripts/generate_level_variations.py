@@ -48,12 +48,57 @@ def _select_target_shape(env_state, shape_type: str, index: Optional[int]) -> Tu
     return shape_type, int(index)
 
 
-def _sample_position(rng: np.random.Generator, base_xy: np.ndarray, cfg) -> np.ndarray:
-    rx = cfg.position.range_x
-    ry = cfg.position.range_y
-    dx = rng.uniform(low=rx[0], high=rx[1]) if cfg.vary.position else 0.0
-    dy = rng.uniform(low=ry[0], high=ry[1]) if cfg.vary.position else 0.0
-    return base_xy + np.array([dx, dy], dtype=np.float32)
+def _sample_position(
+    rng: np.random.Generator,
+    base_xy: np.ndarray,
+    cfg,
+    static_env_params=None,
+    env_params=None,
+    env_state=None,
+    shape_type: str = None,
+    shape_idx: int = None,
+) -> np.ndarray:
+    """Sample a new absolute world position across the visible map.
+
+    Always samples absolute coordinates using map size from
+    screen_dim / pixels_per_unit, constrained by configurable margins.
+    """
+    assert static_env_params is not None and env_params is not None, "Static and dynamic env params required"
+
+    width = static_env_params.screen_dim[0] / env_params.pixels_per_unit
+    height = static_env_params.screen_dim[1] / env_params.pixels_per_unit
+
+    # Compute clearance so the shape stays fully inside bounds (and above ground)
+    clearance = 0.0
+    if (env_state is not None) and (shape_type is not None) and (shape_idx is not None):
+        if shape_type == "circle":
+            try:
+                clearance = float(np.array(env_state.circle.radius)[shape_idx])
+            except Exception:
+                clearance = 0.0
+        else:
+            try:
+                verts = np.array(env_state.polygon.vertices)[shape_idx]
+                n = int(np.array(env_state.polygon.n_vertices)[shape_idx])
+                verts = verts[:n]
+                circ = float(np.linalg.norm(verts, axis=1).max()) if n > 0 else 0.0
+                poly_r = float(np.array(env_state.polygon.radius)[shape_idx])
+                clearance = max(circ, poly_r)
+            except Exception:
+                clearance = 0.0
+
+    margin = float(getattr(cfg.position, "margin", 0.2))
+    ground_margin = float(getattr(cfg.position, "ground_margin", margin))
+    top_margin = float(getattr(cfg.position, "top_margin", margin))
+
+    x_low = margin + clearance
+    x_high = max(x_low, width - margin - clearance)
+    y_low = ground_margin + clearance
+    y_high = max(y_low, height - top_margin - clearance)
+
+    x = rng.uniform(low=x_low, high=x_high) if cfg.vary.position else float(base_xy[0])
+    y = rng.uniform(low=y_low, high=y_high) if cfg.vary.position else float(base_xy[1])
+    return np.array([x, y], dtype=np.float32)
 
 
 def _sample_rotation(rng: np.random.Generator, base_rot: float, cfg) -> float:
@@ -139,7 +184,16 @@ def main(cfg: DictConfig):
     stem = f"{in_stem}_{'-'.join(stem_suffix) if stem_suffix else 'copy'}"
 
     for i in range(int(cfg.num_variants)):
-        xy = _sample_position(rng, base_xy, cfg)
+        xy = _sample_position(
+            rng,
+            base_xy,
+            cfg,
+            static_env_params,
+            env_params,
+            env_state,
+            shape_type,
+            shape_idx,
+        )
         rot = _sample_rotation(rng, base_rot, cfg)
 
         variant_state = _apply_variant(env_state, static_env_params, shape_type, shape_idx, xy, rot)

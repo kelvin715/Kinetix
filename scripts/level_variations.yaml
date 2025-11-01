@@ -7,11 +7,13 @@ seed: 0
 
 vary:
   position: true
-  rotation: true
+  rotation: false
 
 position:
-  range_x: [-0.75, 0.75]
-  range_y: [-0.75, 0.75]
+  # Margins (in world units) to keep the object on-screen and above ground
+  margin: 0.2
+  ground_margin: 0.2
+  top_margin: 0.2
 
 rotation:
   range: [0.0, 6.283185307179586]
