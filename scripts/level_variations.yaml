@@ -9,12 +9,6 @@ vary:
   position: true
   rotation: false
 
-position:
-  # Margins (in world units) to keep the object on-screen and above ground
-  margin: 0.2
-  ground_margin: 0.2
-  top_margin: 0.2
-
 rotation:
   range: [0.0, 6.283185307179586]
 

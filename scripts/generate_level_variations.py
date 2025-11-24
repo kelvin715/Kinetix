@@ -55,50 +55,142 @@ def _sample_position(
     static_env_params=None,
     env_params=None,
     env_state=None,
-    shape_type: str = None,
-    shape_idx: int = None,
+    shape_type: Optional[str] = None,
+    shape_idx: Optional[int] = None,
 ) -> np.ndarray:
     """Sample a new absolute world position across the visible map.
 
-    Always samples absolute coordinates using map size from
-    screen_dim / pixels_per_unit, constrained by configurable margins.
+    New strategy:
+    - If varying position, uniformly sample positions within screen bounds.
+    - Reject any candidate that would overlap any other active shape (including ground),
+      using simple bounding-circle tests for polygons and circles.
+    - Fall back to base_xy if no valid sample is found within max tries.
     """
     assert static_env_params is not None and env_params is not None, "Static and dynamic env params required"
 
-    width = static_env_params.screen_dim[0] / env_params.pixels_per_unit
-    height = static_env_params.screen_dim[1] / env_params.pixels_per_unit
+    # If not varying position, just keep the original
+    if not cfg.vary.position:
+        return np.array([float(base_xy[0]), float(base_xy[1])], dtype=np.float32)
 
-    # Compute clearance so the shape stays fully inside bounds (and above ground)
-    clearance = 0.0
+    width = float(static_env_params.screen_dim[0] / env_params.pixels_per_unit)
+    height = float(static_env_params.screen_dim[1] / env_params.pixels_per_unit)
+
+    # Helper to compute a conservative bounding radius for polygons
+    def _polygon_radius(es, idx: int) -> float:
+        if es is None:
+            return 0.0
+        try:
+            verts = np.array(es.polygon.vertices)[idx]
+            n = int(np.array(es.polygon.n_vertices)[idx])
+            verts = verts[:n]
+            circ = float(np.linalg.norm(verts, axis=1).max()) if n > 0 else 0.0
+            poly_r = float(np.array(es.polygon.radius)[idx])
+            return max(circ, poly_r)
+        except Exception:
+            return 0.0
+
+    # Compute target shape radius
     if (env_state is not None) and (shape_type is not None) and (shape_idx is not None):
         if shape_type == "circle":
             try:
-                clearance = float(np.array(env_state.circle.radius)[shape_idx])
+                target_r = float(np.array(env_state.circle.radius)[shape_idx])
             except Exception:
-                clearance = 0.0
+                target_r = 0.0
         else:
+            target_r = _polygon_radius(env_state, int(shape_idx))
+    else:
+        target_r = 0.0
+
+    # Precompute AABBs of all other active shapes (xmin, xmax, ymin, ymax)
+    other_aabbs = []
+    target_shape_type = shape_type
+    target_shape_idx = int(shape_idx) if shape_idx is not None else -1
+
+    if env_state is not None:
+
+        def _poly_world_aabb(es, idx: int):
             try:
-                verts = np.array(env_state.polygon.vertices)[shape_idx]
-                n = int(np.array(env_state.polygon.n_vertices)[shape_idx])
+                pos = np.array(es.polygon.position)[idx]
+                rot = float(np.array(es.polygon.rotation)[idx])
+                verts = np.array(es.polygon.vertices)[idx]
+                n = int(np.array(es.polygon.n_vertices)[idx])
                 verts = verts[:n]
-                circ = float(np.linalg.norm(verts, axis=1).max()) if n > 0 else 0.0
-                poly_r = float(np.array(env_state.polygon.radius)[shape_idx])
-                clearance = max(circ, poly_r)
+                if n == 0:
+                    return None
+                c = np.cos(rot)
+                s = np.sin(rot)
+                R = np.array([[c, -s], [s, c]], dtype=np.float32)
+                world_verts = verts @ R.T + pos[None, :]
+                xmin = float(world_verts[:, 0].min())
+                xmax = float(world_verts[:, 0].max())
+                ymin = float(world_verts[:, 1].min())
+                ymax = float(world_verts[:, 1].max())
+                return (xmin, xmax, ymin, ymax)
             except Exception:
-                clearance = 0.0
+                return None
 
-    margin = float(getattr(cfg.position, "margin", 0.2))
-    ground_margin = float(getattr(cfg.position, "ground_margin", margin))
-    top_margin = float(getattr(cfg.position, "top_margin", margin))
+        # Polygons
+        poly_pos = np.array(env_state.polygon.position)
+        poly_active = np.array(env_state.polygon.active).astype(bool)
+        num_polys = poly_pos.shape[0] if poly_pos.ndim > 0 else 0
+        for j in range(num_polys):
+            if not poly_active[j]:
+                continue
+            if target_shape_type == "polygon" and j == target_shape_idx:
+                continue
+            aabb = _poly_world_aabb(env_state, j)
+            if aabb is not None:
+                other_aabbs.append(aabb)
 
-    x_low = margin + clearance
-    x_high = max(x_low, width - margin - clearance)
-    y_low = ground_margin + clearance
-    y_high = max(y_low, height - top_margin - clearance)
+        # Circles
+        circ_pos = np.array(env_state.circle.position)
+        circ_active = np.array(env_state.circle.active).astype(bool)
+        circ_radius = np.array(env_state.circle.radius)
+        num_circs = circ_pos.shape[0] if circ_pos.ndim > 0 else 0
+        for j in range(num_circs):
+            if not circ_active[j]:
+                continue
+            if target_shape_type == "circle" and j == target_shape_idx:
+                continue
+            rj = float(circ_radius[j])
+            cx = float(circ_pos[j, 0])
+            cy = float(circ_pos[j, 1])
+            other_aabbs.append((cx - rj, cx + rj, cy - rj, cy + rj))
 
-    x = rng.uniform(low=x_low, high=x_high) if cfg.vary.position else float(base_xy[0])
-    y = rng.uniform(low=y_low, high=y_high) if cfg.vary.position else float(base_xy[1])
-    return np.array([x, y], dtype=np.float32)
+    other_aabbs = (
+        np.array(other_aabbs, dtype=np.float32) if len(other_aabbs) > 0 else np.zeros((0, 4), dtype=np.float32)
+    )
+
+    # Screen bounds so the bounding circle stays inside
+    x_low = target_r
+    x_high = max(x_low, width - target_r)
+    y_low = target_r
+    y_high = max(y_low, height - target_r)
+
+    # Try multiple times to find a non-overlapping location
+    max_tries = int(getattr(getattr(cfg, "position", {}), "max_tries", 100))
+    eps = 1e-6
+    for _ in range(max_tries):
+        x = float(rng.uniform(low=x_low, high=x_high))
+        y = float(rng.uniform(low=y_low, high=y_high))
+        if other_aabbs.shape[0] == 0:
+            return np.array([x, y], dtype=np.float32)
+        # Target AABB (use circle AABB for target as conservative bound)
+        txmin, txmax = x - target_r, x + target_r
+        tymin, tymax = y - target_r, y + target_r
+        # AABB overlap test
+        oxmin = other_aabbs[:, 0]
+        oxmax = other_aabbs[:, 1]
+        oymin = other_aabbs[:, 2]
+        oymax = other_aabbs[:, 3]
+        overlap_x = np.logical_not((txmax < oxmin - eps) | (txmin > oxmax + eps))
+        overlap_y = np.logical_not((tymax < oymin - eps) | (tymin > oymax + eps))
+        overlaps = overlap_x & overlap_y
+        if not np.any(overlaps):
+            return np.array([x, y], dtype=np.float32)
+
+    # Fallback if we could not find a valid spot
+    return np.array([float(base_xy[0]), float(base_xy[1])], dtype=np.float32)
 
 
 def _sample_rotation(rng: np.random.Generator, base_rot: float, cfg) -> float:

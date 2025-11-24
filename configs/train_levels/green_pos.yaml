@@ -1,0 +1,24 @@
+train_level_mode: list
+train_levels_list:
+  [
+    "green_pos/grasp_easy_pos_v0000.json",
+    "green_pos/grasp_easy_pos_v0001.json",
+    "green_pos/grasp_easy_pos_v0002.json",
+    "green_pos/grasp_easy_pos_v0003.json",
+    "green_pos/grasp_easy_pos_v0004.json",
+    "green_pos/grasp_easy_pos_v0005.json",
+    "green_pos/grasp_easy_pos_v0006.json",
+    "green_pos/grasp_easy_pos_v0007.json",
+    "green_pos/grasp_easy_pos_v0008.json",
+    "green_pos/grasp_easy_pos_v0009.json",
+    "green_pos/grasp_easy_pos_v0010.json",
+    "green_pos/grasp_easy_pos_v0011.json",
+    "green_pos/grasp_easy_pos_v0012.json",
+    "green_pos/grasp_easy_pos_v0013.json",
+    "green_pos/grasp_easy_pos_v0014.json",
+    "green_pos/grasp_easy_pos_v0015.json",
+    "green_pos/grasp_easy_pos_v0016.json",
+    "green_pos/grasp_easy_pos_v0017.json",
+    "green_pos/grasp_easy_pos_v0018.json",
+    "green_pos/grasp_easy_pos_v0019.json",
+  ]
