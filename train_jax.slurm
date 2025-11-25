@@ -21,4 +21,4 @@ source .venv/bin/activate
 # export XLA_PYTHON_CLIENT_MEM_FRACTION=0.8
 
 # 4. Run your JAX script
-python3 experiments/ppo.py train_levels=green_pos env_size=l eval=eval_auto
+python3 experiments/ppo.py train_levels=green_pos_100 env_size=l eval=eval_auto
