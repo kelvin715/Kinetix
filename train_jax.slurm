@@ -6,7 +6,7 @@
 #SBATCH --mem=128G                    # adjust as needed
 #SBATCH --time=08:00:00              # walltime
 
-#SBATCH --output=kinetix_sfl_%j.out   # <--- stdout file
+#SBATCH --output=kinetix_plr_%j.out   # <--- stdout file
 
 # 1. Go to your project
 cd /home/y/youngjin/Kinetix
@@ -23,4 +23,4 @@ source .venv/bin/activate
 # export XLA_PYTHON_CLIENT_MEM_FRACTION=0.8
 
 # 4. Run your JAX script
-python3 experiments/sfl.py train_levels=green_pos_100 env_size=l eval=eval_auto
+python3 experiments/plr.py train_levels=green_pos_100 env_size=l eval=eval_auto
