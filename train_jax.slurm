@@ -18,7 +18,7 @@ module load cuda/12.9                # or the exact CUDA your JAX wheel expects
 source .venv/bin/activate
 
 # Optional: JAX/XLA memory flags (example)
-# export XLA_PYTHON_CLIENT_PREALLOCATE=false
+export XLA_PYTHON_CLIENT_PREALLOCATE=false
 # or something like:
 # export XLA_PYTHON_CLIENT_MEM_FRACTION=0.8
 
