@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=kinetix_ppo
 #SBATCH --partition=gpu              # or whatever your GPU partition is
-#SBATCH --gres=gpu:h100-96:1                 # number of GPUs
+#SBATCH --gres=gpu:h200-141:1                 # number of GPUs
 #SBATCH --cpus-per-task=32            # adjust as needed
 #SBATCH --mem=128G                    # adjust as needed
 #SBATCH --time=08:00:00              # walltime
