@@ -1,0 +1,13 @@
+# Configuration for generating grasp_hard level variations
+# Varies x position of blue circle and green square + podium
+
+input_json: "l/grasp_hard.json"
+output_dir: "outputs/hard_level_variants"
+num_variants: 100
+seed: 42
+
+# Margin from screen edges (in world units)
+x_margin: 0.3
+
+# Minimum separation between blue circle and green+podium (in world units)
+min_separation: 0.5

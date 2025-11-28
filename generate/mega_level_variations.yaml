@@ -1,0 +1,59 @@
+seed: 42
+num_variants: 10
+
+# Input base level and output directory
+input_json: "green_pos/grasp_easy_pos_v0000.json"
+output_dir: "outputs/mega_level_variants"
+
+# What to vary
+vary:
+  joints: true
+  blue_x: true
+  grey_x: true
+  green_rot: true
+  green_pos: true
+
+# Role mapping; override if your level uses different role ids
+roles:
+  green_role: 1
+  blue_role: 2
+  grey_role: 3
+  prefer_polygon: true
+
+# Joint angle variation config
+joints:
+  selection: "indices" # "all" | "indices"
+  indices: [4, 5] # vary only these joint indexes (adjust for your level)
+  mode: "delta" # "delta" | "absolute"
+  range: [-0.3, 0.3] # radians; meaning depends on mode
+  respect_limits: true
+
+# X-only sampling ranges; if null, use screen bounds based on shape radius
+blue_x:
+  min: null
+  max: null
+  max_tries: 200
+
+grey_x:
+  min: null
+  max: null
+  max_tries: 200
+
+# Green rotation sampling
+green_rot:
+  range: [-1.57079632679, 1.57079632679] # +/- 90 degrees
+  max_tries: 200
+
+# Green position sampling (x and y); if null bounds, use screen-based bounds
+green_pos:
+  x_min: null
+  x_max: null
+  y_min: null
+  y_max: null
+  max_tries: 200
+
+# General sampling / safety options
+sampling:
+  eps: 1.0e-6
+  # When true, if a valid sample isn't found within max_tries, fall back to base value
+  fallback_to_base: true

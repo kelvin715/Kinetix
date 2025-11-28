@@ -23,4 +23,4 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false
 # export XLA_PYTHON_CLIENT_MEM_FRACTION=0.8
 
 # 4. Run your JAX script
-python3 experiments/plr.py train_levels=green_pos_100 env_size=l eval=eval_auto video_frequency=0
+python3 experiments/plr.py train_levels=green_pos_100 env_size=l eval=eval_auto misc.video_frequency=0
