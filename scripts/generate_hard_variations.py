@@ -1,4 +1,4 @@
-"""Generate variations of grasp_hard.json by varying x positions of blue circle and green square + podium."""
+"""Generate variations of grasp_hard.json by varying positions of blue circle and green square + podium."""
 
 from pathlib import Path
 
@@ -110,6 +110,32 @@ def _sample_x_position(
     return float(rng.uniform(low=x_low, high=x_high))
 
 
+def _sample_green_y_position(
+    rng: np.random.Generator,
+    podium_top_y: float,
+    green_radius: float,
+    cfg,
+    static_env_params,
+    env_params,
+) -> float:
+    """Sample a new y position for the green box above the podium."""
+    height = float(static_env_params.screen_dim[1] / env_params.pixels_per_unit)
+
+    # Green box must be at least on top of podium, up to some max height
+    y_low = podium_top_y + green_radius + cfg.get("green_y_min_above_podium", 0.1)
+
+    # Constrain y_high: min of (screen top margin, offset from y_low, hard cap at y=2.5 to stay visible)
+    max_visible_y = cfg.get("green_y_max_visible", 2.5)
+    y_high = min(
+        height - green_radius - cfg.get("y_margin", 0.3),
+        y_low + cfg.get("green_y_max_offset", 0.8),
+        max_visible_y,
+    )
+    y_high = max(y_low, y_high)
+
+    return float(rng.uniform(low=y_low, high=y_high))
+
+
 def _apply_variant(
     env_state,
     static_env_params,
@@ -118,8 +144,13 @@ def _apply_variant(
     podium_idx: int,
     new_blue_x: float,
     new_green_x: float,
+    new_green_y: float = None,
 ):
-    """Apply x position changes to the blue circle and green square + podium."""
+    """Apply position changes to the blue circle and green square + podium.
+
+    Args:
+        new_green_y: If provided, sets new y position for green box only (podium y unchanged).
+    """
     # Update blue circle x position (keep y the same)
     blue_pos = np.array(env_state.circle.position)[blue_circle_idx]
     new_blue_pos = jnp.array([new_blue_x, float(blue_pos[1])], dtype=jnp.float32)
@@ -133,15 +164,16 @@ def _apply_variant(
     green_pos = np.array(env_state.polygon.position)[green_square_idx]
     x_delta = new_green_x - float(green_pos[0])
 
-    # Update green square x position
-    new_green_pos = jnp.array([new_green_x, float(green_pos[1])], dtype=jnp.float32)
+    # Update green square position (x always, y if provided)
+    green_y = new_green_y if new_green_y is not None else float(green_pos[1])
+    new_green_pos = jnp.array([new_green_x, green_y], dtype=jnp.float32)
     env_state = env_state.replace(
         polygon=env_state.polygon.replace(
             position=env_state.polygon.position.at[green_square_idx].set(new_green_pos),
         )
     )
 
-    # Update podium x position (same delta as green square)
+    # Update podium x position (same delta as green square, y unchanged)
     podium_pos = np.array(env_state.polygon.position)[podium_idx]
     new_podium_pos = jnp.array([float(podium_pos[0]) + x_delta, float(podium_pos[1])], dtype=jnp.float32)
     env_state = env_state.replace(
@@ -183,12 +215,21 @@ def main(cfg: DictConfig):
 
     # Get base positions and radii
     blue_base_x = float(np.array(env_state.circle.position)[blue_circle_idx, 0])
-    green_base_x = float(np.array(env_state.polygon.position)[green_square_idx, 0])
+    green_base_pos = np.array(env_state.polygon.position)[green_square_idx]
+    green_base_x = float(green_base_pos[0])
+    podium_pos = np.array(env_state.polygon.position)[podium_idx]
 
     blue_radius = _get_shape_radius(env_state, "circle", blue_circle_idx)
-    # Use podium radius for the green+podium group (it's wider)
+    # Use podium radius for the green+podium group x (it's wider)
     podium_radius = _get_shape_radius(env_state, "polygon", podium_idx)
-    green_radius = max(_get_shape_radius(env_state, "polygon", green_square_idx), podium_radius)
+    green_radius = _get_shape_radius(env_state, "polygon", green_square_idx)
+    green_x_radius = max(green_radius, podium_radius)
+
+    # Calculate podium top y (podium center + its half-height)
+    podium_verts = np.array(env_state.polygon.vertices)[podium_idx]
+    podium_n = int(np.array(env_state.polygon.n_vertices)[podium_idx])
+    podium_half_height = float(np.abs(podium_verts[:podium_n, 1]).max()) if podium_n > 0 else 0.0
+    podium_top_y = float(podium_pos[1]) + podium_half_height
 
     rng = np.random.default_rng(int(cfg.seed))
 
@@ -197,19 +238,25 @@ def main(cfg: DictConfig):
 
     # Determine filename stem from input
     in_stem = Path(src_path).stem
-    stem = f"{in_stem}_xvar"
+    vary_green_y = cfg.get("vary_green_y", True)
+    stem = f"{in_stem}_{'xyvar' if vary_green_y else 'xvar'}"
 
     for i in range(int(cfg.num_variants)):
         # Sample new x positions
         new_blue_x = _sample_x_position(rng, blue_base_x, blue_radius, cfg, static_env_params, env_params)
-        new_green_x = _sample_x_position(rng, green_base_x, green_radius, cfg, static_env_params, env_params)
+        new_green_x = _sample_x_position(rng, green_base_x, green_x_radius, cfg, static_env_params, env_params)
 
         # Ensure minimum separation between blue circle and green+podium
         min_sep = cfg.get("min_separation", 1.0)
         attempts = 0
-        while abs(new_blue_x - new_green_x) < min_sep + blue_radius + green_radius and attempts < 100:
-            new_green_x = _sample_x_position(rng, green_base_x, green_radius, cfg, static_env_params, env_params)
+        while abs(new_blue_x - new_green_x) < min_sep + blue_radius + green_x_radius and attempts < 100:
+            new_green_x = _sample_x_position(rng, green_base_x, green_x_radius, cfg, static_env_params, env_params)
             attempts += 1
+
+        # Sample green y position if enabled
+        new_green_y = None
+        if vary_green_y:
+            new_green_y = _sample_green_y_position(rng, podium_top_y, green_radius, cfg, static_env_params, env_params)
 
         variant_state = _apply_variant(
             env_state,
@@ -219,6 +266,7 @@ def main(cfg: DictConfig):
             podium_idx,
             new_blue_x,
             new_green_x,
+            new_green_y,
         )
 
         filename = _compose_filename(stem, i)

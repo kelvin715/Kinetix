@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=kinetix_ppo
 #SBATCH --partition=gpu              # or whatever your GPU partition is
-#SBATCH --gres=gpu:h200-141:1                 # number of GPUs
+#SBATCH --gres=gpu:h100-47:1                 # number of GPUs
 #SBATCH --cpus-per-task=32            # adjust as needed
 #SBATCH --mem=128G                    # adjust as needed
 #SBATCH --time=08:00:00              # walltime
 
-#SBATCH --output=kinetix_plr_%j.out   # <--- stdout file
+#SBATCH --output=hard_pos_100_y_%j.out   # <--- stdout file
 
 # 1. Go to your project
 cd /home/y/youngjin/Kinetix
@@ -23,4 +23,4 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false
 # export XLA_PYTHON_CLIENT_MEM_FRACTION=0.8
 
 # 4. Run your JAX script
-python3 experiments/plr.py train_levels=green_pos_100 env_size=l eval=eval_auto misc.video_frequency=0
+python3 experiments/ppo.py train_levels=hard_pos_100_y env_size=l eval=eval_auto
