@@ -14,6 +14,10 @@ y_margin: 0.3
 # Minimum separation between blue circle and green+podium (in world units)
 min_separation: 0.5
 
+# Whether to vary green box x independently from podium x (all 3 objects vary independently)
+# When false (default), green box and podium share the same x position
+independent_green_x: true
+
 # Whether to also vary the y position of the green box (podium y stays fixed)
 vary_green_y: true
 

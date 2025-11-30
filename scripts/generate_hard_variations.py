@@ -145,11 +145,13 @@ def _apply_variant(
     new_blue_x: float,
     new_green_x: float,
     new_green_y: float = None,
+    new_podium_x: float = None,
 ):
-    """Apply position changes to the blue circle and green square + podium.
+    """Apply position changes to the blue circle, green square, and podium.
 
     Args:
         new_green_y: If provided, sets new y position for green box only (podium y unchanged).
+        new_podium_x: If provided, sets podium x independently. Otherwise, podium x follows green x.
     """
     # Update blue circle x position (keep y the same)
     blue_pos = np.array(env_state.circle.position)[blue_circle_idx]
@@ -160,9 +162,9 @@ def _apply_variant(
         )
     )
 
-    # Calculate x delta for green square and podium
+    # Get current positions
     green_pos = np.array(env_state.polygon.position)[green_square_idx]
-    x_delta = new_green_x - float(green_pos[0])
+    podium_pos = np.array(env_state.polygon.position)[podium_idx]
 
     # Update green square position (x always, y if provided)
     green_y = new_green_y if new_green_y is not None else float(green_pos[1])
@@ -173,9 +175,13 @@ def _apply_variant(
         )
     )
 
-    # Update podium x position (same delta as green square, y unchanged)
-    podium_pos = np.array(env_state.polygon.position)[podium_idx]
-    new_podium_pos = jnp.array([float(podium_pos[0]) + x_delta, float(podium_pos[1])], dtype=jnp.float32)
+    # Update podium x position (independent if provided, otherwise follows green x delta)
+    if new_podium_x is not None:
+        podium_x = new_podium_x
+    else:
+        x_delta = new_green_x - float(green_pos[0])
+        podium_x = float(podium_pos[0]) + x_delta
+    new_podium_pos = jnp.array([podium_x, float(podium_pos[1])], dtype=jnp.float32)
     env_state = env_state.replace(
         polygon=env_state.polygon.replace(
             position=env_state.polygon.position.at[podium_idx].set(new_podium_pos),
@@ -218,12 +224,14 @@ def main(cfg: DictConfig):
     green_base_pos = np.array(env_state.polygon.position)[green_square_idx]
     green_base_x = float(green_base_pos[0])
     podium_pos = np.array(env_state.polygon.position)[podium_idx]
+    podium_base_x = float(podium_pos[0])
 
     blue_radius = _get_shape_radius(env_state, "circle", blue_circle_idx)
-    # Use podium radius for the green+podium group x (it's wider)
     podium_radius = _get_shape_radius(env_state, "polygon", podium_idx)
     green_radius = _get_shape_radius(env_state, "polygon", green_square_idx)
-    green_x_radius = max(green_radius, podium_radius)
+
+    # Whether to vary green and podium x independently
+    independent_green_x = cfg.get("independent_green_x", False)
 
     # Calculate podium top y (podium center + its half-height)
     podium_verts = np.array(env_state.polygon.vertices)[podium_idx]
@@ -239,18 +247,31 @@ def main(cfg: DictConfig):
     # Determine filename stem from input
     in_stem = Path(src_path).stem
     vary_green_y = cfg.get("vary_green_y", True)
-    stem = f"{in_stem}_{'xyvar' if vary_green_y else 'xvar'}"
+    if independent_green_x:
+        stem = f"{in_stem}_indep{'y' if vary_green_y else ''}"
+    else:
+        stem = f"{in_stem}_{'xyvar' if vary_green_y else 'xvar'}"
 
     for i in range(int(cfg.num_variants)):
         # Sample new x positions
         new_blue_x = _sample_x_position(rng, blue_base_x, blue_radius, cfg, static_env_params, env_params)
-        new_green_x = _sample_x_position(rng, green_base_x, green_x_radius, cfg, static_env_params, env_params)
 
-        # Ensure minimum separation between blue circle and green+podium
+        if independent_green_x:
+            # Vary green and podium x independently
+            new_green_x = _sample_x_position(rng, green_base_x, green_radius, cfg, static_env_params, env_params)
+            new_podium_x = _sample_x_position(rng, podium_base_x, podium_radius, cfg, static_env_params, env_params)
+        else:
+            # Green and podium move together (use larger radius for collision)
+            green_x_radius = max(green_radius, podium_radius)
+            new_green_x = _sample_x_position(rng, green_base_x, green_x_radius, cfg, static_env_params, env_params)
+            new_podium_x = None  # Will follow green x
+
+        # Ensure minimum separation between blue circle and green/podium
         min_sep = cfg.get("min_separation", 1.0)
         attempts = 0
-        while abs(new_blue_x - new_green_x) < min_sep + blue_radius + green_x_radius and attempts < 100:
-            new_green_x = _sample_x_position(rng, green_base_x, green_x_radius, cfg, static_env_params, env_params)
+        check_radius = green_radius if independent_green_x else max(green_radius, podium_radius)
+        while abs(new_blue_x - new_green_x) < min_sep + blue_radius + check_radius and attempts < 100:
+            new_green_x = _sample_x_position(rng, green_base_x, check_radius, cfg, static_env_params, env_params)
             attempts += 1
 
         # Sample green y position if enabled
@@ -267,6 +288,7 @@ def main(cfg: DictConfig):
             new_blue_x,
             new_green_x,
             new_green_y,
+            new_podium_x,
         )
 
         filename = _compose_filename(stem, i)
