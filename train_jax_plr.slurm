@@ -23,8 +23,10 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false
 # export XLA_PYTHON_CLIENT_MEM_FRACTION=0.8
 
 # 4. Run your JAX script
-python3 experiments/plr.py train_levels=hard_pos_100_y_indix env_size=l eval=eval_auto learning.num_train_envs=512 \
-  learning.outer_rollout_steps=2 \
+# NOTE: num_steps × outer_rollout_steps MUST equal env_params.max_timesteps (256)
+python3 experiments/plr.py train_levels=hard_pos_100_y_indix env_size=l eval=eval_auto \
+  learning.num_train_envs=512 \
+  learning.outer_rollout_steps=4 \
   learning.num_steps=64 \
   ued.level_buffer_capacity=1000 \
   eval.eval_num_attempts=5 \
