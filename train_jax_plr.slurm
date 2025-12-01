@@ -6,7 +6,7 @@
 #SBATCH --mem=128G                    # adjust as needed
 #SBATCH --time=08:00:00              # walltime
 
-#SBATCH --output=plr_hard_pos_100_y_indix_50_%j.out   # <--- stdout file
+#SBATCH --output=plr_hard_pos_100_y_indix_%j.out   # <--- stdout file
 
 # 1. Go to your project
 cd /home/y/youngjin/Kinetix
@@ -23,4 +23,9 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false
 # export XLA_PYTHON_CLIENT_MEM_FRACTION=0.8
 
 # 4. Run your JAX script
-python3 experiments/plr.py train_levels=hard_pos_100_y_indix_50 env_size=l eval=eval_auto
+python3 experiments/plr.py train_levels=hard_pos_100_y_indix env_size=l eval=eval_auto learning.num_train_envs=512 \
+  learning.outer_rollout_steps=2 \
+  learning.num_steps=64 \
+  ued.level_buffer_capacity=1000 \
+  eval.eval_num_attempts=5 \
+  misc.video_frequency=50
