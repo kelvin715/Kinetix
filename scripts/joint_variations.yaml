@@ -1,0 +1,27 @@
+# Configuration for generating grasp_hard level variations with arm joint angles and positions
+
+input_json: "l/grasp_hard.json"
+output_dir: "outputs/joint_level_variants"
+num_variants: 100
+seed: 42
+
+# ============================================================================
+# Joint angle variation
+# ============================================================================
+vary_joint_4: true # Elbow joint (controls bend between arm segments)
+vary_joint_5: true # Shoulder joint (controls overall arm direction from gray ball)
+
+# Joint angle variation ranges (in radians, added to base angle)
+joint_4_range: [-1.5, 1.5] # ±86° elbow bend variation
+joint_5_range: [-3.14159, 3.14159] # Full 360° rotation
+
+# ============================================================================
+# Position variation (blue circle, green box + podium)
+# ============================================================================
+vary_positions: true # Enable x position variation for blue circle and green+podium
+
+# Margin from screen edges (in world units)
+x_margin: 0.5
+
+# Minimum separation between blue circle and green+podium (in world units)
+min_separation: 0.5

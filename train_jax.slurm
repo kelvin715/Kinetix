@@ -6,7 +6,7 @@
 #SBATCH --mem=128G                    # adjust as needed
 #SBATCH --time=08:00:00              # walltime
 
-#SBATCH --output=hard_pos_100_y_indix_%j.out   # <--- stdout file
+#SBATCH --output=vary_joints_100_%j.out   # <--- stdout file
 
 # 1. Go to your project
 cd /home/y/youngjin/Kinetix
@@ -23,4 +23,4 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false
 # export XLA_PYTHON_CLIENT_MEM_FRACTION=0.8
 
 # 4. Run your JAX script
-python3 experiments/ppo.py train_levels=hard_pos_100_y_indix env_size=l eval=eval_auto
+python3 experiments/ppo.py train_levels=vary_joints_100 env_size=l eval=eval_auto
