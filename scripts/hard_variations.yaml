@@ -3,9 +3,9 @@
 # Optionally varies y position of green square (above podium)
 
 input_json: "l/grasp_hard.json"
-output_dir: "outputs/hard_level_variants"
-num_variants: 100
-seed: 42
+output_dir: "outputs/eval_variants"
+num_variants: 50
+seed: 33
 
 # Margin from screen edges (in world units)
 x_margin: 0.3
@@ -16,10 +16,10 @@ min_separation: 0.5
 
 # Whether to vary green box x independently from podium x (all 3 objects vary independently)
 # When false (default), green box and podium share the same x position
-independent_green_x: true
+independent_green_x: false
 
 # Whether to also vary the y position of the green box (podium y stays fixed)
-vary_green_y: true
+vary_green_y: false
 
 # Green box y position constraints (when vary_green_y is true)
 green_y_min_above_podium: 0.1 # Minimum distance above podium top
