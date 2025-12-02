@@ -17,13 +17,34 @@ module load cuda/12.9
 # 3. Activate your virtualenv
 source .venv/bin/activate
 
-# 4. JAX multi-GPU settings
+# 4. JAX/CUDA multi-GPU settings
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
-# Ensure JAX sees all GPUs (usually automatic, but explicit is safer)
-# export XLA_FLAGS="--xla_gpu_enable_triton_softmax_fusion=true --xla_gpu_triton_gemm_any=false"
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
 
-# 5. Verify GPU detection (optional debug)
-python3 -c "import jax; print(f'JAX devices: {jax.devices()}')"
+# Fix NCCL duplicate GPU issue
+export NCCL_DEBUG=WARN
+# Use shared memory for intra-node communication (more stable on some clusters)
+export NCCL_SHM_DISABLE=0
+# Disable P2P if GPUs are on different NUMA nodes or have connectivity issues
+export NCCL_P2P_DISABLE=0
+# Set unique NCCL ID per job
+export NCCL_UNIQUE_ID=$SLURM_JOB_ID
+
+# 5. Verify GPU detection
+echo "=== GPU Debug Info ==="
+echo "SLURM_JOB_ID: $SLURM_JOB_ID"
+echo "CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
+nvidia-smi -L
+python3 -c "
+import jax
+print(f'JAX devices: {jax.devices()}')
+print(f'Device count: {jax.device_count()}')
+print(f'Local device count: {jax.local_device_count()}')
+# Check if devices have unique IDs
+for i, d in enumerate(jax.devices()):
+    print(f'  Device {i}: {d.id} - {d.device_kind}')
+"
+echo "======================"
 
 # 6. Run SFL
 # Key: num_train_envs, num_batches, num_to_save must be divisible by num_gpus (2)
